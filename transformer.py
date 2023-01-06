@@ -5,25 +5,36 @@ import torch.nn as nn
 class AttentionLayer(nn.Module):
     def __init__(self, D=32, F = 32, H = 4):
         super().__init__()
+        assert(D % H == 0 and F % H == 0)
+        self.D_H = D // H
+        self.F_H = F // H
+
         # Reminder: Q will have shape (B, N, D), K will have shape (B, M, D), V will have shape (B, M, F)
-        self.W_Q = nn.parameter.Parameter(torch.empty(H, D, D))
-        self.W_K = nn.parameter.Parameter(torch.empty(H, D, D))
-        self.W_V = nn.parameter.Parameter(torch.empty(H, F, F))
+        self.W_Q = nn.parameter.Parameter(torch.empty(H, self.D_H, self.D_H))
+        self.W_K = nn.parameter.Parameter(torch.empty(H, self.D_H, self.D_H))
+        self.W_V = nn.parameter.Parameter(torch.empty(H, self.F_H, self.F_H))
         nn.init.xavier_normal_(self.W_Q)
         nn.init.xavier_normal_(self.W_K)
         nn.init.xavier_normal_(self.W_V)
 
-        # O projects back from a shape of (B, H, N, F) to (B, N, F*H)
-        self.O = nn.parameter.Parameter(torch.empty(F*H, F))
+        # O recombines the heads
+        self.O = nn.parameter.Parameter(torch.empty(F, F))
         nn.init.xavier_normal_(self.O)
 
 
     def forward(self, X_Q, X_K, X_V, mask = None):
+        # X_Q = (b, q, d), similarly other inputs
+        # We need to split the last dimension into heads 
+        # X_Q = (b, q, d) -> X_Q = (b, q, h, d/h)
+        X_Q = X_Q.reshape(X_Q.shape[0], X_Q.shape[1], X_Q.shape[2] // self.D_H, self.D_H)
+        X_K = X_K.reshape(X_K.shape[0], X_K.shape[1], X_K.shape[2] // self.D_H, self.D_H)
+        X_V = X_V.reshape(X_V.shape[0], X_V.shape[1], X_V.shape[2] // self.F_H, self.F_H)
+
         # Say we have q queries, k keys
         # In the unbatched case, we have Q = (q, d), K = (k, d), V = (k, f)
         # We want to compute QK^T = (q, k)
         # We can do this with einsum while also keeping track of batches b and heads h
-        Q_KT = torch.einsum("bqd, hdd, bkd, hdd -> bhqk", X_Q, self.W_Q, X_K, self.W_K) / torch.sqrt(torch.tensor(X_Q.shape[2]))
+        Q_KT = torch.einsum("bqhd, hdd, bkhd, hdd -> bhqk", X_Q, self.W_Q, X_K, self.W_K) / torch.sqrt(torch.tensor(X_Q.shape[3]))
         # Now we need to mask the upper triangle of QK^T
         # We can do this by setting the upper triangle to -inf on the last two dimensions of QK^T
         if mask is not None:
@@ -33,21 +44,19 @@ class AttentionLayer(nn.Module):
         # Now we can compute the attention
         # In the unbatched case, QK^T = (q, k), V = (k, f)
         # Q^KT * V = (q, f)
-        #V = torch.einsum("bkf, hff -> bhkf", X_V, self.W_V) 
-        #O = torch.einsum("bhqk, bhkf -> bhqf", Q_KT, V)       
-        O = torch.einsum("bhqk, hff, bkf -> bhqf", Q_KT, self.W_V, X_V)
-        # Now we can concatenate the heads
-        # O = (b, h, q, f) -> O = (b, q, h*f)
-        O = O.transpose(1, 2)
-        O = O.reshape(O.shape[0], O.shape[1], O.shape[2] * O.shape[3])
-        # Now we can project back to the original dimension
-        return torch.einsum("bqx, xf -> bqf", O, self.O)
+        Y = torch.einsum("bhqk, bkhf, hff -> bqhf", Q_KT, X_V, self.W_V)
+        # Now we need to recombine the heads
+        # Y = (b, q, h, f/h)
+        Y = Y.reshape(Y.shape[0], Y.shape[1], Y.shape[2] * Y.shape[3])
+        # Y = (b, q, f)
+        return torch.einsum("bqf, ff -> bqf", Y, self.O)
 
 
 # Uses self attention to compute the output
 class Transformer(nn.Module):
     def __init__(self, tokens, D=32, H = 4, L = 4, positional_encoding = None, mask = None):
         super().__init__()
+        assert(D % H == 0)
         self.tokens = tokens
         self.positional_encoding = positional_encoding
         self.mask = mask
