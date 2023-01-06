@@ -12,7 +12,7 @@ sequence_length = 8
 N = 1_000_000
 loss = nn.CrossEntropyLoss()
 
-force_train = False
+force_train = True
 
 # Generate dataset of N sequences of heads/tails with uniform probability of length L
 def generate_dataset(N, L):
@@ -23,6 +23,7 @@ if __name__ == '__main__':
     total_data = generate_dataset(N, sequence_length).to(device)
     # We need to mask out the future tokens
     mask = torch.tril(torch.ones(sequence_length-1, sequence_length-1)).to(torch.int64).to(device)
+    
 
     # input has shape (N, L)
     # output has shape (N, L, 2)

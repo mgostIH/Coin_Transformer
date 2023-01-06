@@ -28,8 +28,8 @@ class AttentionLayer(nn.Module):
         # We can do this by setting the upper triangle to -inf on the last two dimensions of QK^T
         if mask is not None:
             Q_KT.masked_fill_(mask == 0, float("-inf"))
-        # Now we can compute the softmax on the q dimension (rows)
-        Q_KT = torch.softmax(Q_KT, dim=2)
+        # Now we can compute the softmax on the k dimension (rows)
+        Q_KT = torch.softmax(Q_KT, dim=3)
         # Now we can compute the attention
         # In the unbatched case, QK^T = (q, k), V = (k, f)
         # Q^KT * V = (q, f)
@@ -38,7 +38,8 @@ class AttentionLayer(nn.Module):
         O = torch.einsum("bhqk, hff, bkf -> bhqf", Q_KT, self.W_V, X_V)
         # Now we can concatenate the heads
         # O = (b, h, q, f) -> O = (b, q, h*f)
-        O = O.reshape(O.shape[0], O.shape[2], O.shape[1] * O.shape[3])
+        O = O.transpose(1, 2)
+        O = O.reshape(O.shape[0], O.shape[1], O.shape[2] * O.shape[3])
         # Now we can project back to the original dimension
         return torch.einsum("bqx, xf -> bqf", O, self.O)
 

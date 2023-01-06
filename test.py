@@ -12,7 +12,7 @@ X = torch.rand((B, N, D))
 mask = torch.tril(torch.ones(X.shape[1], X.shape[1])).to(torch.int64)
 Z = torch.zeros((B, N, N))
 Z.masked_fill_(mask == 0, float('-inf'))
-print(Z)
+print(torch.softmax(Z, dim=2))
 
 
 layer = transformer.AttentionLayer(D, D, H)
