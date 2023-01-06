@@ -54,6 +54,9 @@ class Transformer(nn.Module):
         self.embeddings = nn.Embedding(tokens, D)
         self.attentions = nn.modules.ModuleList([AttentionLayer(D, D, H) for _ in range(L)])
         self.layer_norms = nn.modules.ModuleList([nn.LayerNorm(D) for _ in range(L)])
+        self.networks = nn.modules.ModuleList([
+            nn.Sequential(nn.Linear(D, D), nn.ReLU(), nn.Linear(D, D), nn.ReLU(), nn.Linear(D, D)) 
+            for _ in range(L)])
         self.logit_weights = nn.parameter.Parameter(torch.empty(D, tokens))
         nn.init.xavier_normal_(self.logit_weights)
 
@@ -68,7 +71,10 @@ class Transformer(nn.Module):
             # Use pre-norm
             # X has shape (B, N, D)
             X_norm = self.layer_norms[i](X)
-            X = X + self.attentions[i](X_norm, X_norm, X_norm, self.mask)
+            Y = self.attentions[i](X_norm, X_norm, X_norm, self.mask)
+            # Apply neural network on each row of Y
+            Y = self.networks[i](Y)
+            X = X + Y
         # Output logits for tokens
         return torch.einsum("bqd, dt -> bqt", X, self.logit_weights)
         

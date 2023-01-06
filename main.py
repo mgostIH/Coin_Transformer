@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-epochs = 1
-learning_rate = 1e-3
-batch_size = 320
+epochs = 100
+learning_rate = 5e-4
+batch_size = 1024
 sequence_length = 8
 N = 1_000_000
 loss = nn.CrossEntropyLoss()
@@ -16,8 +16,8 @@ force_train = True
 
 # Generate dataset of N sequences of heads/tails with uniform probability of length L
 def generate_dataset(N, L):
-    U = torch.rand((N, L))
-    return torch.bernoulli(U).to(torch.long)
+    U = torch.rand((N,1))
+    return torch.bernoulli(U.expand((N,L))).to(torch.long)
 
 if __name__ == '__main__':
     total_data = generate_dataset(N, sequence_length).to(device)
