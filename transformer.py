@@ -41,3 +41,32 @@ class AttentionLayer(nn.Module):
         O = O.reshape(O.shape[0], O.shape[2], O.shape[1] * O.shape[3])
         # Now we can project back to the original dimension
         return torch.einsum("bqx, xf -> bqf", O, self.O)
+
+
+# Uses self attention to compute the output
+class Transformer(nn.Module):
+    def __init__(self, tokens, D=32, H = 4, L = 4, positional_encoding = None, mask = None):
+        super().__init__()
+        self.tokens = tokens
+        self.positional_encoding = positional_encoding
+        self.mask = mask
+        self.embeddings = nn.Embedding(tokens, D)
+        self.attentions = nn.modules.ModuleList([AttentionLayer(D, D, H) for _ in range(L)])
+        self.layer_norms = nn.modules.ModuleList([nn.LayerNorm(D) for _ in range(L)])
+        self.logit_weights = nn.parameter.Parameter(torch.empty(D, tokens))
+        nn.init.xavier_normal_(self.logit_weights)
+
+    def forward(self, X):
+        # Embed tokens
+        X = self.embeddings(X)
+        # Add positional encoding, if any
+        if self.positional_encoding is not None:
+            X = X + self.positional_encoding(X.shape[1])
+        # Apply attention layers
+        for i in range(len(self.attentions)):
+            # Use pre-norm
+            X_norm = self.layer_norms[i](X)
+            X = X + self.attentions[i](X_norm, X_norm, X_norm, self.mask)
+        # Output logits for tokens
+        return torch.einsum("bqd, dt -> bqt", X, self.logit_weights)
+        
