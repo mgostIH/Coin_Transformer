@@ -65,6 +65,7 @@ class Transformer(nn.Module):
         # Apply attention layers
         for i in range(len(self.attentions)):
             # Use pre-norm
+            # X has shape (B, N, D)
             X_norm = self.layer_norms[i](X)
             X = X + self.attentions[i](X_norm, X_norm, X_norm, self.mask)
         # Output logits for tokens
