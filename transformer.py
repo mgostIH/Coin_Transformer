@@ -55,7 +55,7 @@ class Transformer(nn.Module):
         self.attentions = nn.modules.ModuleList([AttentionLayer(D, D, H) for _ in range(L)])
         self.layer_norms = nn.modules.ModuleList([nn.LayerNorm(D) for _ in range(L)])
         self.networks = nn.modules.ModuleList([
-            nn.Sequential(nn.Linear(D, D), nn.ReLU(), nn.Linear(D, D), nn.ReLU(), nn.Linear(D, D)) 
+            nn.Sequential(nn.Linear(D, D), nn.GELU(), nn.Linear(D, D), nn.GELU(), nn.Linear(D, D)) 
             for _ in range(L)])
         self.logit_weights = nn.parameter.Parameter(torch.empty(D, tokens))
         nn.init.xavier_normal_(self.logit_weights)
