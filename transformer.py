@@ -6,15 +6,15 @@ class AttentionLayer(nn.Module):
     def __init__(self, D=32, F = 32, H = 4):
         super().__init__()
         # Reminder: Q will have shape (B, N, D), K will have shape (B, M, D), V will have shape (B, M, F)
-        self.W_Q = torch.empty(H, D, D)
-        self.W_K = torch.empty(H, D, D)
-        self.W_V = torch.empty(H, F, F)
+        self.W_Q = nn.parameter.Parameter(torch.empty(H, D, D))
+        self.W_K = nn.parameter.Parameter(torch.empty(H, D, D))
+        self.W_V = nn.parameter.Parameter(torch.empty(H, F, F))
         nn.init.xavier_normal_(self.W_Q)
         nn.init.xavier_normal_(self.W_K)
         nn.init.xavier_normal_(self.W_V)
 
         # O projects back from a shape of (B, H, N, F) to (B, N, F*H)
-        self.O = torch.empty(F*H, F)
+        self.O = nn.parameter.Parameter(torch.empty(F*H, F))
         nn.init.xavier_normal_(self.O)
 
 
