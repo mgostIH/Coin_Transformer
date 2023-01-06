@@ -11,6 +11,8 @@ batch_size = 1024
 sequence_length = 8
 N = 1_000_000
 loss = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam
+
 
 force_train = True
 
@@ -41,22 +43,26 @@ if __name__ == '__main__':
         except FileNotFoundError:
             force_train = True
     if force_train:
-        for _ in range(epochs):
-            for i in range(0, N, batch_size):
-                X = total_data[i:i + batch_size]
-                Y = X[:, 1:]
-                X = X[:, :-1]
-                # CrossEntropyLoss expects (N, C, L) for input and (N, L) for output
-                # model(X) has shape (N, L, 2)
-                # Y has shape (N, L)
-                # We need to transpose model(X) to (N, L, 2)
-                Y_hat = model(X)
-                l = loss(Y_hat.transpose(1, 2), Y)
-                l.backward()
-                optimizer.step()
-                optimizer.zero_grad()
-                L.append(l.item())
-            print(L[-1])
+        # In case CTRL+C is pressed stop training and save the model
+        try:
+            for _ in range(epochs):
+                for i in range(0, N, batch_size):
+                    X = total_data[i:i + batch_size]
+                    Y = X[:, 1:]
+                    X = X[:, :-1]
+                    # CrossEntropyLoss expects (N, C, L) for input and (N, L) for output
+                    # model(X) has shape (N, L, 2)
+                    # Y has shape (N, L)
+                    # We need to transpose model(X) to (N, L, 2)
+                    Y_hat = model(X)
+                    l = loss(Y_hat.transpose(1, 2), Y)
+                    l.backward()
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    L.append(l.item())
+                print(L[-1])
+        except KeyboardInterrupt:
+            pass
         # Save the model and losses
         torch.save(model.state_dict(), 'model.pt')
         torch.save(L, 'losses.pt')
