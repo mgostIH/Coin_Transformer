@@ -15,7 +15,7 @@ H = 4
 loss = nn.CrossEntropyLoss()
 
 
-force_train = True
+force_train = False
 
 # Generate dataset of N sequences of heads/tails with uniform probability of length L
 # Every sequence must start with a start token 2
@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
     # input has shape (N, L)
     # output has shape (N, L, 3)
-    model = transformer.Transformer(3, D=D, H=H, mask=mask, positional_encoding=False).to(device)
+    model = transformer.Transformer(3, D=D, H=H, mask=mask, positional_encoding=True).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     # Observe prediction from given input
