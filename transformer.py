@@ -13,13 +13,13 @@ class AttentionLayer(nn.Module):
         self.W_Q = nn.parameter.Parameter(torch.empty(H, self.D_H, self.D_H))
         self.W_K = nn.parameter.Parameter(torch.empty(H, self.D_H, self.D_H))
         self.W_V = nn.parameter.Parameter(torch.empty(H, self.F_H, self.F_H))
-        nn.init.xavier_normal_(self.W_Q)
-        nn.init.xavier_normal_(self.W_K)
-        nn.init.xavier_normal_(self.W_V)
+        nn.init.kaiming_normal_(self.W_Q)
+        nn.init.kaiming_normal_(self.W_K)
+        nn.init.kaiming_normal_(self.W_V)
 
         # O recombines the heads
         self.O = nn.parameter.Parameter(torch.empty(F, F))
-        nn.init.xavier_normal_(self.O)
+        nn.init.kaiming_normal_(self.O)
 
 
     def forward(self, X_Q, X_K, X_V, mask = None):
@@ -64,10 +64,10 @@ class Transformer(nn.Module):
         self.attentions = nn.modules.ModuleList([AttentionLayer(D, D, H) for _ in range(L)])
         self.layer_norms = nn.modules.ModuleList([nn.LayerNorm(D) for _ in range(L)])
         self.networks = nn.modules.ModuleList([
-            nn.Sequential(nn.Linear(D, D), nn.GELU(), nn.Linear(D, D), nn.GELU(), nn.Linear(D, D)) 
+            nn.Sequential(nn.Linear(D, D, bias = False), nn.GELU(), nn.Linear(D, D, bias = False)) 
             for _ in range(L)])
         self.logit_weights = nn.parameter.Parameter(torch.empty(D, tokens))
-        nn.init.xavier_normal_(self.logit_weights)
+        nn.init.kaiming_normal_(self.logit_weights)
 
     def forward(self, X):
         # Embed tokens
@@ -80,10 +80,7 @@ class Transformer(nn.Module):
             # Use pre-norm
             # X has shape (B, N, D)
             X_norm = self.layer_norms[i](X)
-            Y = self.attentions[i](X_norm, X_norm, X_norm, self.mask)
-            # Apply neural network on each row of Y
-            Y = self.networks[i](Y)
-            X = X + Y
+            X = X + self.attentions[i](X_norm, X_norm, X_norm, self.mask) + self.networks[i](X_norm)
         # Output logits for tokens
         return torch.einsum("bqd, dt -> bqt", X, self.logit_weights)
         
