@@ -7,10 +7,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 epochs = 100
 learning_rate = 1e-3
-batch_size = 512
+batch_size = 1_024
 sequence_length = 32
-N = 100_000
-D = 128
+N = 1_000_000
+D = 32
 H = 4
 loss = nn.CrossEntropyLoss()
 
@@ -18,9 +18,11 @@ loss = nn.CrossEntropyLoss()
 force_train = True
 
 # Generate dataset of N sequences of heads/tails with uniform probability of length L
+# Every sequence must start with a start token 2
 def generate_dataset(N, L):
     U = torch.rand((N,1))
-    return torch.bernoulli(U.expand((N,L))).to(torch.long)
+    X = torch.bernoulli(U.expand((N,L-1))).to(torch.long)
+    return torch.cat((torch.ones((N,1)).to(torch.long) * 2, X), dim=1)
 
 if __name__ == '__main__':
     total_data = generate_dataset(N, sequence_length).to(device)
@@ -28,18 +30,15 @@ if __name__ == '__main__':
     mask = torch.tril(torch.ones(sequence_length-1, sequence_length-1)).to(torch.int64).to(device)
 
 
-    pos_encoding = torch.empty((1, sequence_length, D)).to(device)
-    nn.init.normal_(pos_encoding, mean=0, std=0.1)
-    position = lambda i: pos_encoding[:, :i, :]
-
     # input has shape (N, L)
-    # output has shape (N, L, 2)
-    model = transformer.Transformer(2, D=D, H=H, mask=mask, positional_encoding=position).to(device)
+    # output has shape (N, L, 3)
+    model = transformer.Transformer(3, D=D, H=H, mask=mask, positional_encoding=False).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     # Observe prediction from given input
-    X = torch.ones((1, sequence_length)).to(device).to(torch.long)
-    # Y_hat has shape (1, 8, 2)
+    X = torch.ones((1, sequence_length-1))
+    X = torch.cat((torch.ones((1,1)) * 2, X), dim=1).to(device).to(torch.long)
+    # Y_hat has shape (1, 8, 3)
     Y_hat = model(X[:, :-1])
     print(loss(Y_hat.transpose(1, 2), X[:, 1:]))
     print(Y_hat)
@@ -64,9 +63,9 @@ if __name__ == '__main__':
                     Y = X[:, 1:]
                     X = X[:, :-1]
                     # CrossEntropyLoss expects (N, C, L) for input and (N, L) for output
-                    # model(X) has shape (N, L, 2)
+                    # model(X) has shape (N, L, 3)
                     # Y has shape (N, L)
-                    # We need to transpose model(X) to (N, L, 2)
+                    # We need to transpose model(X) to (N, L, 3)
                     Y_hat = model(X)
                     l = loss(Y_hat.transpose(1, 2), Y)
                     l.backward()
@@ -84,8 +83,9 @@ if __name__ == '__main__':
     plt.show()
 
     # Observe prediction from given input
-    X = torch.ones((1, sequence_length)).to(device).to(torch.long)
-    # Y_hat has shape (1, 8, 2)
+    X = torch.ones((1, sequence_length-1))
+    X = torch.cat((torch.ones((1,1)) * 2, X), dim=1).to(device).to(torch.long)
+    # Y_hat has shape (1, 8, 3)
     Y_hat = model(X[:, :-1])
     print(loss(Y_hat.transpose(1, 2), X[:, 1:]))
     print(Y_hat)

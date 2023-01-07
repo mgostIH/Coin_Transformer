@@ -54,11 +54,11 @@ class AttentionLayer(nn.Module):
 
 # Uses self attention to compute the output
 class Transformer(nn.Module):
-    def __init__(self, tokens, D=32, H = 4, L = 4, positional_encoding = None, mask = None):
+    def __init__(self, tokens, D=32, H = 4, L = 4, positional_encoding = True, mask = None):
         super().__init__()
         assert(D % H == 0)
         self.tokens = tokens
-        self.positional_encoding = positional_encoding
+        self.positional_encoding = nn.Embedding(1000, D) if positional_encoding else None
         self.mask = mask
         self.embeddings = nn.Embedding(tokens, D)
         self.attentions = nn.modules.ModuleList([AttentionLayer(D, D, H) for _ in range(L)])
@@ -74,7 +74,7 @@ class Transformer(nn.Module):
         X = self.embeddings(X)
         # Add positional encoding, if any
         if self.positional_encoding is not None:
-            X = X + self.positional_encoding(X.shape[1])
+            X = X + self.positional_encoding(torch.arange(X.shape[1], device = X.device))
         # Apply attention layers
         for i in range(len(self.attentions)):
             # Use pre-norm
